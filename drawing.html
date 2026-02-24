@@ -1,57 +1,295 @@
 <!DOCTYPE html>
 <html>
-<head><title>✏️ 开始画画</title></head>
-<body style="margin:0; padding:16px; font-family:sans-serif;">
-  <h3>请画一幅画（例如：太阳、房子、笑脸）</h3>
-  <canvas id="canvas" width="500" height="300"
-          style="border:1px solid #ccc; background:#fff; cursor:crosshair;"></canvas>
-  <br><br>
-  <button onclick="clearCanvas()">🧹 清空</button>
-  <button onclick="submitDrawing()" style="background:#007bff;color:white;border:none;padding:6px 12px;">✅ 完成并评分</button>
-  <p id="status" style="color:#666; margin-top:12px;"></p>
+<head>
+    <meta charset="UTF-8">
+    <title>⏰ 钟表绘画练习</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        body { margin:0; padding:20px; font-family:sans-serif; text-align:center; background-color: #f9f9f9; }
+        h2 { margin-bottom: 10px; color: #333; }
+        #target-time-display { font-size:1.2em; color:#d9534f; font-weight:bold; margin-bottom: 15px; display: block;}
+        
+        /* Canvas 样式 */
+        #canvas { 
+            border: 2px solid #333; 
+            background: #fff; 
+            cursor: crosshair; 
+            touch-action: none; /* 防止移动端滚动 */
+            max-width: 100%; 
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            border-radius: 4px;
+        }
 
-  <script>
-    const canvas = document.getElementById('canvas');
-    const ctx = canvas.getContext('2d');
-    let isDrawing = false;
+        /* 按钮容器样式 */
+        .toolbar {
+            margin-top: 15px;
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 8px;
+            max-width: 600px;
+            margin-left: auto;
+            margin-right: auto;
+        }
 
-    canvas.addEventListener('mousedown', () => { isDrawing = true; });
-    canvas.addEventListener('mouseup', () => { isDrawing = false; ctx.beginPath(); });
-    canvas.addEventListener('mousemove', (e) => {
-      if (!isDrawing) return;
-      const rect = canvas.getBoundingClientRect();
-      const x = e.clientX - rect.left;
-      const y = e.clientY - rect.top;
-      ctx.lineWidth = 3;
-      ctx.lineCap = 'round';
-      ctx.strokeStyle = '#000';
-      ctx.lineTo(x, y);
-      ctx.stroke();
-      ctx.beginPath();
-      ctx.moveTo(x, y);
-    });
+        /* 通用按钮样式 */
+        button {
+            padding: 10px 15px;
+            font-size: 14px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.2s;
+            background-color: #fff;
+            color: #333;
+            flex: 1 0 auto; /* 允许换行 */
+            min-width: 80px;
+        }
 
-    function clearCanvas() {
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      document.getElementById('status').textContent = '';
+        button:hover { background-color: #e9ecef; }
+        button:active { transform: scale(0.98); }
+
+        /* 特定按钮颜色增强 */
+        .btn-start { background-color: #28a745; color: white; border-color: #28a745; }
+        .btn-start:hover { background-color: #218838; }
+
+        .btn-clear { background-color: #ffc107; color: #333; border-color: #ffc107; }
+        .btn-clear:hover { background-color: #e0a800; }
+
+        .btn-undo { background-color: #6c757d; color: white; border-color: #6c757d; }
+        .btn-undo:hover { background-color: #5a6268; }
+        .btn-undo:disabled { opacity: 0.5; cursor: not-allowed; }
+
+        .btn-color-dial { border-bottom: 3px solid #000; font-weight: bold; }
+        .btn-color-hour { border-bottom: 3px solid #dc3545; color: #dc3545; font-weight: bold; }
+        .btn-color-minute { border-bottom: 3px solid #007bff; color: #007bff; font-weight: bold; }
+
+        .btn-submit { 
+            background: #007bff; 
+            color: white; 
+            border: none; 
+            font-weight: bold;
+            margin-top: 10px;
+            width: 100%;
+            max-width: 300px;
+        }
+        .btn-submit:hover { background: #0056b3; }
+
+        #status { 
+            color: #666; 
+            margin-top: 20px; 
+            white-space: pre-wrap; 
+            line-height: 1.5;
+            background: #fff;
+            padding: 10px;
+            border-radius: 4px;
+            display: inline-block;
+            min-width: 300px;
+        }
+    </style>
+</head>
+<body>
+
+<h2>⏰ 钟表绘画练习</h2>
+<p id="target-time-display"></p>
+
+<canvas id="canvas" width="500" height="500"></canvas>
+
+<!-- 工具栏按钮 -->
+<div class="toolbar">
+    <!-- 1. 开始 (清除并重设) -->
+    <button class="btn-start" onclick="startNewDrawing()">🚀 开始</button>
+    
+    <!-- 2. 清屏 (仅清空) -->
+    <button class="btn-clear" onclick="clearCanvasOnly()">🧹 清屏</button>
+    
+    <!-- 3. 撤销 -->
+    <button class="btn-undo" id="btnUndo" onclick="undoLastStroke()" disabled>↩️ 撤销</button>
+    
+    <!-- 4. 表盘 (黑色) -->
+    <button class="btn-color-dial" onclick="setColor('#000000')">⚫ 表盘</button>
+    
+    <!-- 5. 时针 (红色) -->
+    <button class="btn-color-hour" onclick="setColor('#dc3545')">🔴 时针</button>
+    
+    <!-- 6. 分针 (蓝色) -->
+    <button class="btn-color-minute" onclick="setColor('#007bff')">🔵 分针</button>
+</div>
+
+<br>
+
+<!-- 7. 保存/提交 -->
+<button class="btn-submit" onclick="submitDrawing()">💾 保存并提交</button>
+
+<p id="status"></p>
+
+<script>
+// ================= 关键配置 =================
+const BACKEND_URL = "https://intergroup-norene-curtailedly.ngrok-free.dev"; 
+// ===========================================
+
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+const btnUndo = document.getElementById('btnUndo');
+
+let isDrawing = false;
+let targetTime = "";
+let currentColor = '#000000'; // 默认黑色
+
+// 用于撤销功能的栈
+let historyStack = [];
+const MAX_HISTORY = 20; // 最多保存 20 步
+
+window.onload = function() {
+    const urlParams = new URLSearchParams(window.location.search);
+    targetTime = urlParams.get('time') || "3:00";
+    document.getElementById('target-time-display').textContent = `请画出时间：${targetTime}`;
+    
+    // 初始化白色背景
+    startNewDrawing();
+};
+
+// --- 核心绘图逻辑 ---
+
+function getPos(e) {
+    const rect = canvas.getBoundingClientRect();
+    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
+    return { 
+        x: (clientX - rect.left) * scaleX, 
+        y: (clientY - rect.top) * scaleY 
+    };
+}
+
+const startDraw = (e) => {
+    isDrawing = true;
+    const pos = getPos(e);
+    ctx.beginPath();
+    ctx.moveTo(pos.x, pos.y);
+    
+    // 设置当前笔触属性
+    ctx.lineWidth = 5;
+    ctx.lineCap = 'round';
+    ctx.strokeStyle = currentColor;
+};
+
+const endDraw = () => {
+    if (!isDrawing) return;
+    isDrawing = false;
+    ctx.closePath();
+    
+    // 将当前状态存入历史栈 (用于撤销)
+    saveState();
+};
+
+const moveDraw = (e) => {
+    if (!isDrawing) return;
+    e.preventDefault(); // 防止触摸滚动
+    const pos = getPos(e);
+    ctx.lineTo(pos.x, pos.y);
+    ctx.stroke();
+};
+
+// 事件监听
+canvas.addEventListener('mousedown', startDraw);
+canvas.addEventListener('mouseup', endDraw);
+canvas.addEventListener('mousemove', moveDraw);
+canvas.addEventListener('mouseleave', endDraw); // 鼠标离开画布也结束
+
+canvas.addEventListener('touchstart', startDraw, {passive: false});
+canvas.addEventListener('touchend', endDraw);
+canvas.addEventListener('touchmove', moveDraw, {passive: false});
+
+// --- 功能函数 ---
+
+// 保存当前画布状态到历史栈
+function saveState() {
+    if (historyStack.length >= MAX_HISTORY) {
+        historyStack.shift(); // 移除最早的记录
     }
+    historyStack.push(canvas.toDataURL());
+    updateUndoButton();
+}
 
-    function submitDrawing() {
-      const dataUrl = canvas.toDataURL('image/png'); // ✅ 标准 data URL
-      document.getElementById('status').textContent = '正在提交...';
+// 更新撤销按钮状态
+function updateUndoButton() {
+    btnUndo.disabled = historyStack.length === 0;
+}
 
-      // ✅ 关键：触发百炼 MCP 工具调用（通过 window.parent.postMessage）
-      // 百炼 Web SDK 兼容方式（适配百炼 Bot 内置 WebView）
-      try {
-        window.parent.postMessage({
-          type: 'CALL_TOOL',
-          toolName: 'draw_and_score',
-          parameters: { canvas_data_url: dataUrl }
-        }, '*');
-      } catch (e) {
-        alert('调用失败，请确保在百炼 Bot 中运行');
-      }
+// 1. 开始按钮：清空并重置历史
+function startNewDrawing() {
+    clearCanvasOnly();
+    historyStack = []; // 清空历史
+    updateUndoButton();
+    document.getElementById('status').textContent = '已重新开始作画';
+    setTimeout(() => { document.getElementById('status').textContent = ''; }, 2000);
+}
+
+// 2. 清屏按钮：仅清空画面，保留历史（或者你也可以选择清空历史，这里按常规逻辑保留历史以便撤销清屏操作，或者直接清空）
+// 为了简单起见，清屏通常意味着“擦除”，这里我们把它当作一步操作存入历史，或者单纯清空。
+// 根据需求“清空绘画区域”，这里实现为纯清空，不存入历史（因为通常清屏后不想撤销回满屏涂鸦）。
+function clearCanvasOnly() {
+    ctx.fillStyle = "#FFFFFF";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    // 注意：这里不清空 historyStack，除非调用 startNewDrawing
+    // 如果希望清屏也能被撤销，可以取消注释下面一行：
+    // saveState(); 
+}
+
+// 3. 撤销按钮
+function undoLastStroke() {
+    if (historyStack.length === 0) return;
+    
+    const lastState = historyStack.pop();
+    const img = new Image();
+    img.src = lastState;
+    img.onload = function() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.drawImage(img, 0, 0);
+    };
+    updateUndoButton();
+}
+
+// 4, 5, 6. 颜色切换
+function setColor(color) {
+    currentColor = color;
+    // 视觉反馈：可以在 status 显示当前颜色，或者改变按钮高亮（此处简化处理）
+    console.log("当前颜色设置为:", color);
+}
+
+// 7. 保存并提交
+async function submitDrawing() {
+    const statusEl = document.getElementById('status');
+    statusEl.textContent = '正在上传并等待处理...';
+    statusEl.style.color = '#666';
+    
+    const dataUrl = canvas.toDataURL('image/png');
+    
+    try {
+        const response = await fetch(`${BACKEND_URL}/api/submit_task`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ image_base64: dataUrl, target_time: targetTime })
+        });
+        
+        if (!response.ok) {
+            const errText = await response.text();
+            throw new Error(`服务器错误：${response.status} - ${errText}`);
+        }
+        
+        const data = await response.json();
+        
+        statusEl.innerHTML = `✅ <b>提交成功！</b>\n\n请复制下面的任务 ID，返回百炼对话框发送给 Agent：\n\n<b style="font-size:1.3em; color:#007bff; background:#f0f8ff; padding:8px; border:1px dashed #007bff; display:inline-block; margin-top:5px;">${data.task_id}</b>`;
+        statusEl.style.color = '#333';
+        
+    } catch (error) {
+        console.error(error);
+        statusEl.innerHTML = `❌ <b>提交失败</b>\n\n错误信息：${error.message}\n\n请检查网络或后端服务`;
+        statusEl.style.color = 'red';
     }
-  </script>
+}
+</script>
 </body>
 </html>
