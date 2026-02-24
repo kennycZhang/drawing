@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html>
+<head><title>✏️ 开始画画</title></head>
+<body style="margin:0; padding:16px; font-family:sans-serif;">
+  <h3>请画一幅画（例如：太阳、房子、笑脸）</h3>
+  <canvas id="canvas" width="500" height="300"
+          style="border:1px solid #ccc; background:#fff; cursor:crosshair;"></canvas>
+  <br><br>
+  <button onclick="clearCanvas()">🧹 清空</button>
+  <button onclick="submitDrawing()" style="background:#007bff;color:white;border:none;padding:6px 12px;">✅ 完成并评分</button>
+  <p id="status" style="color:#666; margin-top:12px;"></p>
+
+  <script>
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+    let isDrawing = false;
+
+    canvas.addEventListener('mousedown', () => { isDrawing = true; });
+    canvas.addEventListener('mouseup', () => { isDrawing = false; ctx.beginPath(); });
+    canvas.addEventListener('mousemove', (e) => {
+      if (!isDrawing) return;
+      const rect = canvas.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const y = e.clientY - rect.top;
+      ctx.lineWidth = 3;
+      ctx.lineCap = 'round';
+      ctx.strokeStyle = '#000';
+      ctx.lineTo(x, y);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(x, y);
+    });
+
+    function clearCanvas() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      document.getElementById('status').textContent = '';
+    }
+
+    function submitDrawing() {
+      const dataUrl = canvas.toDataURL('image/png'); // ✅ 标准 data URL
+      document.getElementById('status').textContent = '正在提交...';
+
+      // ✅ 关键：触发百炼 MCP 工具调用（通过 window.parent.postMessage）
+      // 百炼 Web SDK 兼容方式（适配百炼 Bot 内置 WebView）
+      try {
+        window.parent.postMessage({
+          type: 'CALL_TOOL',
+          toolName: 'draw_and_score',
+          parameters: { canvas_data_url: dataUrl }
+        }, '*');
+      } catch (e) {
+        alert('调用失败，请确保在百炼 Bot 中运行');
+      }
+    }
+  </script>
+</body>
+</html>
